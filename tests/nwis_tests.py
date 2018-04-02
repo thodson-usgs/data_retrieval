@@ -12,4 +12,5 @@ def test_measurements_service():
     return df
 
 def test_measurements_service_answer():
-    assert df['measurement_nu'] == 801
+    df = test_measurements_service()
+    assert df.iloc[0]['tz_cd'] == 'CST'
