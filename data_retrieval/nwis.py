@@ -1,3 +1,8 @@
+"""
+TODO: test whether functions can pull multiple sites at a time
+TODO: work on multi-index capabilities
+"""
+
 import pandas as pd
 import requests
 from io import StringIO
@@ -8,7 +13,9 @@ from data_retrieval.timezones import tz
 #from hygnd.munge import update_merge
 
 NWIS_URL = 'https://waterservices.usgs.gov/nwis/iv/'
-QWDATA_URL =  'https://nwis.waterdata.usgs.gov/nwis/qwdata?'
+QWDATA_URL =  'https://nwis.waterdata.usgs.gov/nwis/qwdata'
+WATERDATA_URL = 'https://nwis.waterdata.usgs.gov/nwis/'
+WATERSERVICE_URL = 'https://waterservices.usgs.gov/nwis/'
 
 def rdb_to_df(url, params=None):
     """ Convert NWIS rdb table into a dataframe.
@@ -124,13 +131,31 @@ def get_samples(sites=None, state_cd=None,
 
     return df
 
+#TODO implement for multiple sites
+def get_discharge_measurements(sites, start=None, end=None):
+    """
+    Args:
+        sites (listlike):
+    """
+    url = WATERDATA_URL + 'measurements'
+    sites = to_str(sites)
+    payload = {'search_site_no':sites,'format':'rdb'}
+    if start:
+        payload['begin_date'] = start
+    if end:
+        payload['end_date'] = end
+        
+    df = rdb_to_df(url, payload)
+
+    return df
 
 def get_site_desc(sites):
     """
     Get site description information from NWIS
     """
 
-    url = 'https://waterservices.usgs.gov/nwis/site/?'
+    #url = 'https://waterservices.usgs.gov/nwis/site/?'
+    url = WATERSERVICE_URL + 'site'
 
     sites = to_str(sites)
     payload = {'sites':sites, 'format':'rdb'}
@@ -153,9 +178,20 @@ def get_all_param_cds():
 
 def get_records(sites, start=None, end=None, service='iv', *args):
     """
-    Args:
+    Get data from NWIS and return it as a DataFrame.
 
+    Args:
+        sites (listlike): List or comma delimited string of site.
+        start (string): Starting date of record (YYYY-MM-DD)
+        end (string): Ending date of record.
+        service (string):
+            - 'iv' : instantaneous data
+            - 'dv' : daily mean data
+            - 'qwdata' : discrete samples
+            - 'site' : site description
+            - 'measurements' : discharge measurements
     Return:
+        DataFrame containing requested data.
     """
     if service == 'iv' or service =='dv':
         json = get_json_record(sites, start, end, service=service, *args)
@@ -168,6 +204,9 @@ def get_records(sites, start=None, end=None, service='iv', *args):
 
     elif service == 'site':
         record_df = get_site_desc(sites)
+
+    elif service == 'measurements':
+        record_df = get_discharge_measurements(sites, start, end)
 
     else:
         print('A record for site {} was not found in service {}'.format(site,service))
