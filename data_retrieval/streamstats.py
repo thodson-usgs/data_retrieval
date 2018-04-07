@@ -33,6 +33,8 @@ def download_workspace(filepath, workspaceID, format=''):
 
     #return
 
+def get_sample_watershed():
+    return get_watershed('NY',-74.524, 43.939) 
 
 def get_watershed(rcode, xlocation, ylocation, crs=4326,
                   includeparameters=True, includeflowtypes=False,

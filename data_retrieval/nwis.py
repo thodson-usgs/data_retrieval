@@ -11,7 +11,6 @@ import re
 
 from data_retrieval.timezones import tz
 #from hygnd.munge import update_merge
-
 NWIS_URL = 'https://waterservices.usgs.gov/nwis/iv/'
 QWDATA_URL =  'https://nwis.waterdata.usgs.gov/nwis/qwdata'
 WATERDATA_URL = 'https://nwis.waterdata.usgs.gov/nwis/'
@@ -294,7 +293,7 @@ def parse_gage_json(json, multi_index=False):
             if not record_json:
                 #no data in record
                 continue
-
+            #should be able to avoid this by dumping
             record_json = str(record_json).replace("'",'"')
 
             # read json, converting all values to float64 and all qaulifiers
@@ -303,7 +302,7 @@ def parse_gage_json(json, multi_index=False):
                                        dtype={'value':'float64',
                                               'qualifiers':'unicode'})
 
-            record_df['qualifiers'] = record_df['qualifiers'].str.strip("[]'")
+            record_df['qualifiers'] = record_df['qualifiers'].str.strip("[]").str.replace("'","")
 
             record_df.rename(columns={'value':col_name,
                                       'dateTime':'datetime',
@@ -321,9 +320,8 @@ def parse_gage_json(json, multi_index=False):
 
             #return record_df
             try:
-                #should be able to replace with outer join
-                merged_df.merge(record_df, how='outer')
-                #merged_df = update_merge(merged_df, record_df)
+                merged_df.join(record_df, how='outer')
+
             except MemoryError:
                 #merged_df wasn't created
                 merged_df = record_df

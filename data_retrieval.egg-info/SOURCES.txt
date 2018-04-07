@@ -1,5 +1,10 @@
 README.md
 setup.py
+data_retrieval/__init__.py
+data_retrieval/nwis.py
+data_retrieval/streamstats.py
+data_retrieval/timezones.py
+data_retrieval/waterqualitydata.py
 data_retrieval.egg-info/PKG-INFO
 data_retrieval.egg-info/SOURCES.txt
 data_retrieval.egg-info/dependency_links.txt
