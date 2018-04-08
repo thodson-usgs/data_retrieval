@@ -1,6 +1,9 @@
-"""
-TODO: test whether functions can pull multiple sites at a time
-TODO: work on multi-index capabilities
+# -*- coding: utf-8 -*-
+"""Functions for downloading data from NWIS
+
+Todo:
+    * Create a test to check whether functions pull multipe sites
+    * Work on multi-index capabilities.
 """
 
 import pandas as pd
@@ -9,70 +12,14 @@ from io import StringIO
 import numpy as np
 import re
 
-from data_retrieval.timezones import tz
+from data_retrieval.codes import tz
+from data_retrieval.utils import to_str
+
 #from hygnd.munge import update_merge
 NWIS_URL = 'https://waterservices.usgs.gov/nwis/iv/'
 QWDATA_URL =  'https://nwis.waterdata.usgs.gov/nwis/qwdata'
 WATERDATA_URL = 'https://nwis.waterdata.usgs.gov/nwis/'
 WATERSERVICE_URL = 'https://waterservices.usgs.gov/nwis/'
-
-def rdb_to_df(url, params=None):
-    """ Convert NWIS rdb table into a dataframe.
-
-    Args:
-          url (string):  Base yrk
-          params: Parameters for REST request
-
-    See https://waterdata.usgs.gov/nwis?automated_retrieval_info
-    """
-    try:
-
-        req = requests.get(url, params=params)
-
-    except ConnectionError:
-
-        print('could not connect to {}'.format(req.url))
-
-    rdb = req.text
-    #return rdb
-    if rdb.startswith('No sites/data'):
-        return None
-    #return None
-
-    count = 0
-
-    for line in rdb.splitlines():
-        # ignore comment lines
-        if line.startswith('#'):
-            count = count + 1
-
-        else:
-            break
-
-    fields = rdb.splitlines()[count].split('\t')
-    dtypes = {'site_no': str}
-    #dtypes =  {‘site_no’: str, }
-    df = pd.read_csv(StringIO(rdb), delimiter='\t', skiprows=count+2, names=fields,
-                     na_values='NaN', dtype=dtypes)
-
-    return df
-
-
-#TODO: move this to core module.
-def to_str(listlike):
-    """Translates list-like objects into strings.
-
-    Return:
-        List-like object as string
-    """
-    if type(listlike) == list:
-        return ','.join(listlike)
-
-    elif type(listlike) == pd.core.series.Series:
-        return ','.join(listlike.tolist())
-
-    elif type(listlike) == str:
-        return listlike
 
 
 #need to acount for time zones
@@ -143,9 +90,30 @@ def get_discharge_measurements(sites, start=None, end=None):
         payload['begin_date'] = start
     if end:
         payload['end_date'] = end
-        
-    df = rdb_to_df(url, payload)
 
+    df = rdb_to_df(url, payload)
+    return df
+
+
+def get_discharge_peaks(**kwargs):
+    """
+
+    Args:
+        site_no (listlike):
+        state_cd (listline):
+
+    """
+    url = WATERDATA_URL + 'peak'
+    payload = {}
+
+    for key, value in kwargs.items():
+        value = to_str(value)
+        payload[key] = value
+
+    payload['format'] = 'rdb'
+
+    df = rdb_to_df(url, payload) 
+    df['peak_dt'] = pd.to_datetime(df['peak_dt'], errors='coerce')
     return df
 
 def get_site_desc(sites):
@@ -174,8 +142,8 @@ def get_all_param_cds():
 
     return df
 
-
-def get_records(sites, start=None, end=None, service='iv', *args):
+#TODO work on passing kwargs
+def get_records(sites, start=None, end=None, service='iv', *args, **kwargs):
     """
     Get data from NWIS and return it as a DataFrame.
 
@@ -206,6 +174,10 @@ def get_records(sites, start=None, end=None, service='iv', *args):
 
     elif service == 'measurements':
         record_df = get_discharge_measurements(sites, start, end)
+
+    elif service == 'peaks':
+        record_df = get_discharge_peaks(site_no=sites, begin_date=start,
+                                        end_date=end, **kwargs)
 
     else:
         print('A record for site {} was not found in service {}'.format(site,service))
@@ -330,6 +302,47 @@ def parse_gage_json(json, multi_index=False):
                 merged_df = record_df
 
     return merged_df
+
+def rdb_to_df(url, params=None):
+    """ Convert NWIS rdb table into a dataframe.
+
+    Args:
+          url (string):  Base yrk
+          params: Parameters for REST request
+
+    See https://waterdata.usgs.gov/nwis?automated_retrieval_info
+    """
+    try:
+
+        req = requests.get(url, params=params)
+
+    except ConnectionError:
+
+        print('could not connect to {}'.format(req.url))
+
+    rdb = req.text
+    #return rdb
+    if rdb.startswith('No sites/data'):
+        return None
+    #return None
+
+    count = 0
+
+    for line in rdb.splitlines():
+        # ignore comment lines
+        if line.startswith('#'):
+            count = count + 1
+
+        else:
+            break
+
+    fields = rdb.splitlines()[count].split('\t')
+    dtypes = {'site_no': str}
+    #dtypes =  {‘site_no’: str, }
+    df = pd.read_csv(StringIO(rdb), delimiter='\t', skiprows=count+2, names=fields,
+                     na_values='NaN', dtype=dtypes)
+
+    return df
 
 
 def sample_gage_record():
