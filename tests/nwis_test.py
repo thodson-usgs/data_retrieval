@@ -1,5 +1,12 @@
 import pytest
-from data_retrieval.nwis import get_records
+from data_retrieval.nwis import get_record
+
+START_DATE = '2018-01-24'
+END_DATE   = '2018-01-25'
+
+DATETIME_COL = 'datetime'
+SITENO_COL = 'site_no'
+
 
 def test_measurements_service():
     """Test measurement service
@@ -8,9 +15,30 @@ def test_measurements_service():
     end   = '2018-01-25'
     service = 'measurements'
     site = '03339000'
-    df = get_records(site, start, end, service=service)
+    df = get_record(site, start, end, service=service)
     return df
 
 def test_measurements_service_answer():
     df = test_measurements_service()
+    # check parsing
     assert df.iloc[0]['measurement_nu'] == 801
+
+def test_iv_service():
+    """Unit test of instantaneous value service
+    """
+    start = START_DATE
+    end   = END_DATE
+    service = 'iv'
+    site = ['03339000','05447500','03346500']
+    return get_record(site, start, end, service=service)
+
+def test_iv_service_answer():
+    df = test_iv_service()
+
+    # check multiindex function
+    assert df.index.names == [SITENO_COL, DATETIME_COL], "iv service returned incorrect index: {}".format(df.index.names)
+
+
+if __name__=='__main__':
+     test_measurements_service_answer()
+     test_iv_service_answer()

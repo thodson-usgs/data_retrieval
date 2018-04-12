@@ -4,6 +4,7 @@
 Todo:
     * Create a test to check whether functions pull multipe sites
     * Work on multi-index capabilities.
+    * Check that all timezones are handled properly for each service.
 """
 
 import pandas as pd
@@ -15,26 +16,35 @@ import re
 from data_retrieval.codes import tz
 from data_retrieval.utils import to_str
 
-#from hygnd.munge import update_merge
-NWIS_URL = 'https://waterservices.usgs.gov/nwis/iv/'
-QWDATA_URL =  'https://nwis.waterdata.usgs.gov/nwis/qwdata'
 WATERDATA_URL = 'https://nwis.waterdata.usgs.gov/nwis/'
 WATERSERVICE_URL = 'https://waterservices.usgs.gov/nwis/'
 
+WATERSERVICES_SERVICES = ['dv','iv','site','stat','gwlevels']
+WATERDATA_SERVICES = ['qwdata','measurements','peak', 'pmcodes'] # add more services
 
-#need to acount for time zones
-def get_samples(sites=None, state_cd=None,
-                  start=None, end=None, multi_index=False, *args):
-    """Pull water quality sample data from NWIS and return as dataframe.
 
-    Args:
-      site (string): X digit USGS site ID. USGS-05586300/
-      start: 2018-01-25
-      end:
+def format_response(response_df):
+    """Setup index for response from query.
     """
-    #payload = {'sites':siteid, 'startDateLo':start, 'startDateHi':end,
-    #       'mimeType':'csv'}
+    #check for multiple sites:
+    if 'datetime' not in response_df.columns:
+        #XXX: consider making site_no index
+        return response_df
 
+    elif len(response_df['site_no'].unique()) > 1:
+        #setup multi-index
+        response_df.set_index(['site_no','datetime'], inplace=True)
+
+    else:
+        response_df.set_index(['datetime'], inplace=True)
+
+    return response_df
+
+
+def get_qwdata(**kwargs):
+    """Get water sample data from qwdata service.
+    """
+    #check number of sites, may need to create multiindex
 
     payload = {'agency_cd':'USGS', 'format':'rdb',
                'pm_cd_compare':'Greater than', 'inventory_output':'0',
@@ -42,108 +52,215 @@ def get_samples(sites=None, state_cd=None,
                'radio_parm_cds':'all_parm_cds', 'rdb_qw_attributes':'expanded',
                'date_format':'YYYY-MM-DD', 'rdb_compression':'value',
                'submmitted_form':'brief_list', 'qw_sample_wide':'separated_wide'}
-    #payload = {'format':'rdb','date_format':'YYYY-MM-DD'}
 
-    # check for sites and state_cd, and if list-like, convert them to strings/freq
+    kwargs = {**payload, **kwargs}
 
-    if sites:
-        payload['site_no'] = to_str(sites)
+    query = query_waterdata('qwdata',**kwargs)
 
-    elif state_cd:
-        payload['state_cd'] = to_str(state_cd)
+    df = read_rdb(query)
 
-    else:
-        raise ValueError('Site or state must be defined')
+    return format_response(df)
 
-    if start: payload['begin_date'] = start
 
-    if end: payload['end_date'] = end
-
-    df = rdb_to_df(QWDATA_URL, payload)
-
-    if type(df) == type(None):
-        return None
-
-    df['sample_start_time_datum_cd'] = df['sample_start_time_datum_cd'].map(tz)
-
-    df['datetime'] = pd.to_datetime(df.pop('sample_dt') + ' ' +
-                                    df.pop('sample_tm') + ' ' + df.pop('sample_start_time_datum_cd'),
-                                    format = '%Y-%m-%d %H:%M')
-    if multi_index == True:
-        df.set_index(['site_no','datetime'], inplace=True)
-    else:
-        df.set_index('datetime', inplace=True)
-    #df.set_index(['site_no','datetime'], inplace=True)
-
-    return df
-
-#TODO implement for multiple sites
-def get_discharge_measurements(sites, start=None, end=None):
-    """
+def get_discharge_measurements(**kwargs):
+    """ **DEPCRECATED**
     Args:
         sites (listlike):
     """
-    url = WATERDATA_URL + 'measurements'
-    sites = to_str(sites)
-    payload = {'search_site_no':sites,'format':'rdb'}
-    if start:
-        payload['begin_date'] = start
-    if end:
-        payload['end_date'] = end
+    query = query_waterdata('measurements', format='rdb', **kwargs)
+    df = read_rdb(query)
 
-    df = rdb_to_df(url, payload)
-    return df
+    return format_response(df)
 
 
-def get_discharge_peaks(**kwargs):
-    """
+def get_peaks(**kwargs):
+    """ **DEPRECATED** Implement through waterservices
 
     Args:
         site_no (listlike):
         state_cd (listline):
 
     """
-    url = WATERDATA_URL + 'peak'
+    query = query_waterdata('measurements', format='rdb', **kwargs)
+
+    df = read_rdb(query)
+
+    return format_response(df)
+
+
+def get_stats(**kwargs):
+    """Querys waterservices statistics information
+
+    Must specify
+    Args:
+        sites (string or list): USGS site number
+        statReportType (string): daily (default), monthly, or annual
+        statTypeCd (string): all, mean, max, min, median
+
+    Returns:
+        Dataframe
+
+    TODO: fix date parsing
+    """
+    if sites not in kwargs:
+        raise TypeError('Query must specify a site or list of sites')
+
+    query = waterservices_query('stat', **kwargs)
+
+    return read_rdb(query)
+
+
+def query(url, **kwargs):
+    """Send a query.
+
+    Wrapper for requests.get that handles errors, converts listed
+    query paramaters to comma separated strings, and returns response.
+
+    Args:
+        url:
+        kwargs: query parameters passed to requests.get
+
+    Returns:
+        string : query response
+    """
+
     payload = {}
 
     for key, value in kwargs.items():
         value = to_str(value)
         payload[key] = value
 
-    payload['format'] = 'rdb'
+    try:
 
-    df = rdb_to_df(url, payload) 
-    df['peak_dt'] = pd.to_datetime(df['peak_dt'], errors='coerce')
-    return df
+        req = requests.get(url, params=payload)
 
-def get_site_desc(sites):
+    except ConnectionError:
+
+        print('could not connect to {}'.format(req.url))
+
+    response_format = kwargs.get('format')
+
+    if response_format == 'json':
+        return req.json()
+
+    else:
+        return req.text
+
+
+def query_waterdata(service, **kwargs):
+    """Querys waterdata.
+    """
+    major_params = ['site_no','state_cd']
+    bbox_params = ['nw_longitude_va', 'nw_latitude_va',
+                   'se_longitude_va','se_latitude_va']
+
+
+    if not any(key in kwargs for key in major_params + bbox_params):
+        raise TypeError('Query must specify a major filter: site_no, stateCd, bBox')
+
+    elif any(key in kwargs for key in bbox_params) \
+    and not all(keys in kwargs for key in bbox_params):
+        raise TypeError('One or more lat/long coordinates missing or invalid.')
+
+    if service not in WATERDATA_SERVICES:
+        raise TypeError('Service not recognized')
+
+
+    url = WATERDATA_URL + service
+
+    return query(url, **kwargs)
+
+
+def query_waterservices(service, **kwargs):
+    """Querys waterservices.usgs.gov
+
+    For more documentation see
+
+    Args:
+        service (string): 'site','stats',etc
+        bBox:
+        huc (string): 7-digit Hydrologic Unit Code
+
+        startDT (string): start date (2017-12-31)
+        endDT (string): end date
+        modifiedSince (string): for example
+
+    Returns:
+        request
+
+    Usage: must specify one major filter: sites, stateCd, bBox,
+    """
+    if not any(key in kwargs for key in ['sites','stateCd','bBox']):
+        raise TypeError('Query must specify a major filter: site_no, stateCd, bBox')
+
+    if service not in WATERSERVICES_SERVICES:
+        raise TypeError('Service not recognized')
+
+    url = WATERSERVICE_URL + service
+
+    return query(url, **kwargs)
+
+
+def get_dv(**kwargs):
+
+    query = query_waterservices('dv', format='json', **kwargs)
+    df = read_json(query)
+
+    return format_response(df)
+
+
+def get_info(**kwargs):
     """
     Get site description information from NWIS
+
+    Parameters:
+        See waterservices_query
+
+    Note: Must specify one major filter: site_no, stateCd, bBox
     """
 
-    #url = 'https://waterservices.usgs.gov/nwis/site/?'
-    url = WATERSERVICE_URL + 'site'
+    query = query_waterservices('site', **kwargs)
 
-    sites = to_str(sites)
-    payload = {'sites':sites, 'format':'rdb'}
-
-    df = rdb_to_df(url, payload)
-    #df.set_index(['site_no'], inplace=True)
-    return df
+    return read_rdb(query)
 
 
-def get_all_param_cds():
-    """Return a DataFrame containing all NWIS parameter codes."""
+def get_iv(**kwargs):
 
-    url = 'https://nwis.waterdata.usgs.gov/nwis/pmcodes?radio_pm_search=param_group&pm_group=All+--+include+all+parameter+groups&pm_search=&casrn_search=&srsname_search=&format=rdb&show=parameter_group_nm&show=parameter_nm&show=casrn&show=srsname&show=parameter_units'
+    query = query_waterservices('iv', format='json', **kwargs)
+    df = read_json(query)
 
-    df = rdb_to_df(url)
-    #df.set_index(['parameter_cd'], inplace=True)
+    return format_response(df)
 
-    return df
 
-#TODO work on passing kwargs
-def get_records(sites, start=None, end=None, service='iv', *args, **kwargs):
+def get_pmcodes(**kwargs):
+    """Return a DataFrame containing all NWIS parameter codes.
+
+    Returns:
+        DataFrame containgin the USGS parameter codes
+    """
+    payload = {'radio_pm_search':'param_group',
+               'pm_group':'All+--+include+all+parameter+groups',
+               'pm_sarch':None,
+               'casrn_search':None,
+               'srsname_search':None,
+               'show':'parameter_group_nm',
+               'show':'casrn',
+               'show':'srsname',
+               'show':'parameter_units',
+               'format':'rdb',
+              }
+
+    kwargs = {**payload, **kwargs}
+
+    #FIXME check that the url is correct
+    url = WATERSERVICE_URL + 'pmcodes'
+    import pdb; pdb.set_trace()
+    df = read_rdb( query(url, **kwargs) )
+
+    return format_response(df)
+
+
+def get_record(sites, start=None, end=None, state=None, service='iv', *args, **kwargs):
     """
     Get data from NWIS and return it as a DataFrame.
 
@@ -160,80 +277,35 @@ def get_records(sites, start=None, end=None, service='iv', *args, **kwargs):
     Return:
         DataFrame containing requested data.
     """
-    if service == 'iv' or service =='dv':
-        json = get_json_record(sites, start, end, service=service, *args)
-        record_df = parse_gage_json(json)
+    if service not in WATERSERVICES_SERVICES + WATERDATA_SERVICES:
+        raise TypeError('Unrecognized service: {}'.format(service))
 
-    #if service == 'dv'
+    if service == 'iv':
+        record_df = get_iv(sites=sites, startDT=start, endDT=end, **kwargs)
+
+    elif service == 'dv':
+        record_df = get_dv(sites=sites, startDT=start, endDT=end, **kwargs)
 
     elif service == 'qwdata':
-        record_df = get_samples(sites, start=start, end=end)
+        record_df = get_qwdata(site_no=sites, begin_date=start, start_date=end)
 
     elif service == 'site':
-        record_df = get_site_desc(sites)
+        record_df = get_info(site_no=sites)
+        #record_df = get_site_desc(sites)
 
     elif service == 'measurements':
-        record_df = get_discharge_measurements(sites, start, end)
+        record_df = get_discharge_measurements(site_no=sites, begin_date=start,
+                                               end_date=end, **kwargs)
 
     elif service == 'peaks':
         record_df = get_discharge_peaks(site_no=sites, begin_date=start,
                                         end_date=end, **kwargs)
 
-    else:
-        print('A record for site {} was not found in service {}'.format(site,service))
-        return
-
     return record_df
 
 
-def get_json_record(sites, start=None, end=None, params=None, service='iv', *args, **kwargs):
-    """Request
-
-    Args:
-        site (string): USGS site number, e.g., 05586300.
-        start (string): 2018-01-25
-        end:
-        kwargs: any additional parameter codes, namely 'parameterCD'
-
-    Returns:
-        Return an object containing the gage record
-
-
-    See https://waterdata.usgs.gov/nwis?automated_retrieval_info
-
-    """
-
-    url = 'https://waterservices.usgs.gov/nwis/iv/'
-
-    # if daily values were requested
-    if service=='dv':
-        url = re.sub('iv/$','dv/$', url)
-
-    sites = to_str(sites)
-
-    payload = {'sites':sites, 'startDT':start, 'endDT':end,
-               'format':'json'} #, 'parameterCD':''}
-
-    if start:
-        payload['startDT'] = start
-    if end:
-        payload['endDT'] = end
-
-    if params:
-        payload['parameterCD'] = to_str(params)
-
-    #for arg in kwargs:
-    #    payload[arg]=to_str(kwargs[arg])
-
-
-    req = requests.get(url, params=payload)
-    req.raise_for_status()
-    #print(req.url)
-    return req.json()
-
-
-def parse_gage_json(json, multi_index=False):
-    """Parses an NWIS formated json into a pandas DataFrame
+def read_json(json, multi_index=False):
+    """Reads a NWIS Water Services formated JSON into a dataframe
 
     Args:
         json (dict)
@@ -241,8 +313,6 @@ def parse_gage_json(json, multi_index=False):
     Returns:
         DataFrame containing times series data from the NWIS json.
     """
-    #FIXME need to check number of sites. If multiple sites, set multi_index
-    # loop through each timeseries in the json
     for timeseries in json['value']['timeSeries']:
 
         site_no = timeseries['sourceInfo']['siteCode'][0]['value']
@@ -275,24 +345,14 @@ def parse_gage_json(json, multi_index=False):
                                               'qualifiers':'unicode'})
 
             record_df['qualifiers'] = record_df['qualifiers'].str.strip("[]").str.replace("'","")
+            record_df['site_no'] = site_no
 
             record_df.rename(columns={'value':col_name,
                                       'dateTime':'datetime',
                                       'qualifiers':col_name + '_cd'}, inplace=True)
 
-            # move to end and if multiple sites were returned, force to mutli-index
-            if multi_index:
-                record_df['site_no'] = site_no
-                record_df.set_index(['site_no','datetime'], inplace=True)
-
-            else:
-                record_df.set_index(['datetime'], inplace=True)
-
-            #record_df.rename(columns={'value':(col_name,'val'),'qualifiers':(col_name,'cd') }, inplace=True)
-
-            #return record_df
             try:
-                merged_df.join(record_df, how='outer')
+                merged_df = merged_df.merge(record_df, on=['site_no','datetime'],how='outer')
 
             except MemoryError:
                 #merged_df wasn't created
@@ -301,27 +361,15 @@ def parse_gage_json(json, multi_index=False):
             except NameError:
                 merged_df = record_df
 
-    return merged_df
+    return format_response(merged_df)
 
-def rdb_to_df(url, params=None):
-    """ Convert NWIS rdb table into a dataframe.
+
+def read_rdb(rdb):
+    """Convert NWIS rdb table into a dataframe.
 
     Args:
-          url (string):  Base yrk
-          params: Parameters for REST request
-
-    See https://waterdata.usgs.gov/nwis?automated_retrieval_info
+        rdb (string):
     """
-    try:
-
-        req = requests.get(url, params=params)
-
-    except ConnectionError:
-
-        print('could not connect to {}'.format(req.url))
-
-    rdb = req.text
-    #return rdb
     if rdb.startswith('No sites/data'):
         return None
     #return None
@@ -342,10 +390,4 @@ def rdb_to_df(url, params=None):
     df = pd.read_csv(StringIO(rdb), delimiter='\t', skiprows=count+2, names=fields,
                      na_values='NaN', dtype=dtypes)
 
-    return df
-
-
-def sample_gage_record():
-    """Gets a sample gage record for testing purposes."""
-
-    return get_records('05586300','2016-10-1','2017-9-30')
+    return format_response(df)
