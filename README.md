@@ -11,7 +11,7 @@ Here's an example of how to use data_retrievel to retrieve data from the Nationa
 ```python
 import data_retrieval.nwis as nwis
 
-site = 03339000
+site = '03339000'
 
 #get instantaneous values (iv)
 df = nwis.get_record(site=site, service='iv', start='2017-12-31', end='2018-01-01')
