@@ -288,7 +288,7 @@ def get_record(sites, start=None, end=None, state=None, service='iv', *args, **k
         record_df = get_dv(sites=sites, startDT=start, endDT=end, **kwargs)
 
     elif service == 'qwdata':
-        record_df = get_qwdata(site_no=sites, start=start, end=end)
+        record_df = get_qwdata(site_no=sites, begin_date=start, start_date=end)
 
     elif service == 'site':
         record_df = get_info(site_no=sites)
