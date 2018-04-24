@@ -23,22 +23,33 @@ WATERSERVICES_SERVICES = ['dv','iv','site','stat','gwlevels']
 WATERDATA_SERVICES = ['qwdata','measurements','peak', 'pmcodes'] # add more services
 
 
-def format_response(response_df):
+def format_response(df):
     """Setup index for response from query.
     """
     #check for multiple sites:
-    if 'datetime' not in response_df.columns:
+    if 'datetime' not in df.columns:
         #XXX: consider making site_no index
-        return response_df
+        return df
 
-    elif len(response_df['site_no'].unique()) > 1:
+    elif len(df['site_no'].unique()) > 1:
         #setup multi-index
-        response_df.set_index(['site_no','datetime'], inplace=True)
+        df.set_index(['site_no','datetime'], inplace=True)
 
     else:
-        response_df.set_index(['datetime'], inplace=True)
+        df.set_index(['datetime'], inplace=True)
 
-    return response_df
+    return df.sort_index()
+
+def format_qwdata_response(df):
+    #create a datetime index from the columns in qwdata response
+    df['sample_start_time_datum_cd'] = df['sample_start_time_datum_cd'].map(tz)
+
+    df['datetime'] = pd.to_datetime(df.pop('sample_dt') + ' ' +
+                                    df.pop('sample_tm') + ' ' +
+                                    df.pop('sample_start_time_datum_cd'),
+                                    format = '%Y-%m-%d %H:%M')
+
+    return format_response(df)
 
 
 def get_qwdata(**kwargs):
@@ -59,7 +70,7 @@ def get_qwdata(**kwargs):
 
     df = read_rdb(query)
 
-    return format_response(df)
+    return format_qwdata_response(df)
 
 
 def get_discharge_measurements(**kwargs):
@@ -254,7 +265,6 @@ def get_pmcodes(**kwargs):
 
     #FIXME check that the url is correct
     url = WATERSERVICE_URL + 'pmcodes'
-    import pdb; pdb.set_trace()
     df = read_rdb( query(url, **kwargs) )
 
     return format_response(df)
