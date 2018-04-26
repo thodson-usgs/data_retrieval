@@ -23,9 +23,15 @@ WATERSERVICES_SERVICES = ['dv','iv','site','stat','gwlevels']
 WATERDATA_SERVICES = ['qwdata','measurements','peak', 'pmcodes'] # add more services
 
 
-def format_response(df):
+def format_response(df, service=None):
     """Setup index for response from query.
     """
+    if df is None:
+        return
+
+    if service=='qwdata':
+        df = preformat_qwdata_response(df)
+
     #check for multiple sites:
     if 'datetime' not in df.columns:
         #XXX: consider making site_no index
@@ -40,7 +46,8 @@ def format_response(df):
 
     return df.sort_index()
 
-def format_qwdata_response(df):
+
+def preformat_qwdata_response(df):
     #create a datetime index from the columns in qwdata response
     df['sample_start_time_datum_cd'] = df['sample_start_time_datum_cd'].map(tz)
 
@@ -70,7 +77,7 @@ def get_qwdata(**kwargs):
 
     df = read_rdb(query)
 
-    return format_qwdata_response(df)
+    return format_response(df, service='qwdata')
 
 
 def get_discharge_measurements(**kwargs):
