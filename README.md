@@ -9,15 +9,21 @@ data_retrieval is a python alternative to USGS-R's dataRetrieval package for obt
 Here's an example of how to use data_retrievel to retrieve data from the National Water Information System (NWIS).
 
 ```python
+# first import the functions for downloading data from NWIS
 import data_retrieval.nwis as nwis
 
+# specify the USGS site code for which we want data.
 site = '03339000'
 
-#get instantaneous values (iv)
+
+# get instantaneous values (iv)
 df = nwis.get_record(site=site, service='iv', start='2017-12-31', end='2018-01-01')
 
-#get water quality samples (qwdata)
+# get water quality samples (qwdata)
 df2 = nwis.get_record(site=site, service='qwdata', start='2017-12-31', end='2018-01-01')
+
+# get basic info about the site
+df3 = nwis.get_record(site=site, service='site')
 ```
 Services available from NWIS include:
 - instantaneous values (iv)
