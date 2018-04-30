@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#-*- coding: utf-8 -*-
 """Functions for downloading data from NWIS
 
 Todo:
@@ -334,6 +334,8 @@ def read_json(json, multi_index=False):
 
         site_no = timeseries['sourceInfo']['siteCode'][0]['value']
         param_cd = timeseries['variable']['variableCode'][0]['value']
+        #check whether min, max, mean record XXX
+        option =  timeseries['variable']['options']['option'][0].get('value')
 
         # loop through each parameter in timeseries.
         for parameter in timeseries['values']:
@@ -345,6 +347,9 @@ def read_json(json, multi_index=False):
                 # get method, format it, and append to column name
                 method = method.strip("[]()").lower()
                 col_name = '{}_{}'.format(col_name, method)
+
+            if option:
+                col_name = '{}_{}'.format(col_name, option)
 
             col_cd_name = col_name + '_cd'
             record_json = parameter['value']
