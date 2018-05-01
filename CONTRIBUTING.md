@@ -1,14 +1,12 @@
-Contributing
-============
+# Contributing
 
 Contributions to data_retrieval are welcome and greatly appreciated, but please
-read this document before attempting to do so.
+read this document before doing so.
 
-Ways to contribute
-------------------
 
-Reporting Bugs
-~~~~~~~~~~~~~~
+## Ways to contribute
+
+### Reporting Bugs
 
 Report bugs at https://github.com/thodson-usgs/data_retrieval/issues.
 
@@ -18,14 +16,13 @@ When reporting a bug, please include:
 * Your operating system name and version.
 * Any details about your local setup that might be helpful in troubleshooting.
 
-Fixing Bugs
-~~~~~~~~~~~
+### Fixing Bugs
 
 Look through the GitHub issues for bugs. Anything tagged as a "bug" is open to 
 whomever wants to fix it.
 
-Implementing Features
-~~~~~~~~~~~~~~~~~~~~~
+
+### Implementing Features
 
 Look through the GitHub issues for features. Anything tagged with "enhancement"
 and "please-help" is open to whomever wants to implement it.
@@ -33,16 +30,13 @@ and "please-help" is open to whomever wants to implement it.
 Please do not combine multiple feature enhancements into a single pull request.
 
 
-Writing Documentation
-~~~~~~~~~~~~~~~~~~~~~
+### Writing Documentation
 
 data_retrieval could always use more documentation, whether as part of the
 official docs, in docstrings, or even in blog posts or articles.
 
 
-
-Submiting Feedback
-~~~~~~~~~~~~~~~~~~
+### Submiting Feedback
 
 The best way to send feedback is to file an issue at
 https://github.com/thodson-usgs/data_retrieval/issues.
@@ -53,17 +47,15 @@ If you are proposing a feature:
 * Keep the scope as narrow as possible, to make it easier to implement.
 
 
-Contributor Guidelines
-----------------------
+# Contributor Guidelines
 
-Pull Request Guidelines
-~~~~~~~~~~~~~~~~~~~~~~~
+
+## Pull Request Guidelines
 
 Before you submit a pull request, check that it meets these guidelines:
 
-1. Any pull request should include tests. However, this is not a hard
-   requirement; a contribution with no tests is preferablble to no
-   contribution at all.
+1. Any pull request should include tests. However, a contribution with 
+   no tests is preferablble to no contribution at all.
 2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
    feature to the list in README.md.
@@ -71,13 +63,12 @@ Before you submit a pull request, check that it meets these guidelines:
    Appveyor and Travis CI.
 
 
-Coding Standards
-~~~~~~~~~~~~~~~~
+## Coding Standards
 
 * PEP8
 * Docstrings should follow the numpy standard:
   * Example:
-    .. code-block:: python
+    ``` python
     def foo(param1, param2):
     """Example function with types documented in the docstring.
 
@@ -103,8 +94,12 @@ Coding Standards
     True
 
     """
+    ```
   * For more details see https://github.com/sphinx-doc/sphinx/blob/master/doc/ext/example_numpy.py
-* Functions over classes except in tests
+* The public interace should emphasize functions over classes; however, classes can and should be used internally and in tests.
+* Functions for downloading data from a specific web portal must be grouped within their own submodule.
+  * For example, all NWIS functions are located at `data_retrieval.nwis`.
+
 * Quotes via http://stackoverflow.com/a/56190/5549
 
   * Use double quotes around strings that are used for interpolation or that are natural language messages
@@ -112,7 +107,7 @@ Coding Standards
   * Use triple double quotes for docstrings and raw string literals for regular expressions even if they aren't needed.
   * Example:
 
-    .. code-block:: python
+    ``` python
 
         LIGHT_MESSAGES = {
             'English': "There are %(number_of_lights)s lights.",
@@ -126,6 +121,7 @@ Coding Standards
         def is_pirate(message):
             """Return True if the given message sounds piratical."""
             return re.search(r"(?i)(arr|avast|yohoho)!", message) is not None
+    ```
 
   * Write new code in Python 3.
   
