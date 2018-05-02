@@ -20,7 +20,7 @@ WATERDATA_URL = 'https://nwis.waterdata.usgs.gov/nwis/'
 WATERSERVICE_URL = 'https://waterservices.usgs.gov/nwis/'
 
 WATERSERVICES_SERVICES = ['dv','iv','site','stat','gwlevels']
-WATERDATA_SERVICES = ['qwdata','measurements','peak', 'pmcodes'] # add more services
+WATERDATA_SERVICES = ['qwdata','measurements','peaks', 'pmcodes'] # add more services
 
 
 def format_response(df, service=None):
@@ -31,6 +31,9 @@ def format_response(df, service=None):
 
     if service=='qwdata':
         df = preformat_qwdata_response(df)
+
+    elif service=='peaks':
+        df = preformat_peaks_response(df)
 
     #check for multiple sites:
     if 'datetime' not in df.columns:
@@ -47,6 +50,11 @@ def format_response(df, service=None):
     return df.sort_index()
 
 
+def preformat_peaks_response(df):
+    df['datetime'] = pd.to_datetime(df.pop('peak_dt'), errors='coerce')
+    df.dropna(subset=['datetime'])
+    return df
+
 def preformat_qwdata_response(df):
     #create a datetime index from the columns in qwdata response
     df['sample_start_time_datum_cd'] = df['sample_start_time_datum_cd'].map(tz)
@@ -56,7 +64,7 @@ def preformat_qwdata_response(df):
                                     df.pop('sample_start_time_datum_cd'),
                                     format = '%Y-%m-%d %H:%M')
 
-    return format_response(df)
+    return df
 
 
 def get_qwdata(**kwargs):
@@ -91,7 +99,7 @@ def get_discharge_measurements(**kwargs):
     return format_response(df)
 
 
-def get_peaks(**kwargs):
+def get_discharge_peaks(**kwargs):
     """ **DEPRECATED** Implement through waterservices
 
     Args:
@@ -99,11 +107,11 @@ def get_peaks(**kwargs):
         state_cd (listline):
 
     """
-    query = query_waterdata('measurements', format='rdb', **kwargs)
+    query = query_waterdata('peaks', format='rdb', **kwargs)
 
     df = read_rdb(query)
 
-    return format_response(df)
+    return format_response(df, service='peaks')
 
 
 def get_stats(**kwargs):
@@ -209,7 +217,7 @@ def query_waterservices(service, **kwargs):
     Usage: must specify one major filter: sites, stateCd, bBox,
     """
     if not any(key in kwargs for key in ['sites','stateCd','bBox']):
-        raise TypeError('Query must specify a major filter: site_no, stateCd, bBox')
+        raise TypeError('Query must specify a major filter: sites, stateCd, bBox')
 
     if service not in WATERSERVICES_SERVICES:
         raise TypeError('Service not recognized')
@@ -277,7 +285,7 @@ def get_pmcodes(**kwargs):
     return format_response(df)
 
 
-def get_record(sites, start=None, end=None, state=None, service='iv', *args, **kwargs):
+def get_record(sites=None, start=None, end=None, state=None, service='iv', *args, **kwargs):
     """
     Get data from NWIS and return it as a DataFrame.
 
@@ -307,7 +315,7 @@ def get_record(sites, start=None, end=None, state=None, service='iv', *args, **k
         record_df = get_qwdata(site_no=sites, begin_date=start, start_date=end)
 
     elif service == 'site':
-        record_df = get_info(site_no=sites)
+        record_df = get_info(sites=sites)
         #record_df = get_site_desc(sites)
 
     elif service == 'measurements':
