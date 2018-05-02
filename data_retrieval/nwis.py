@@ -14,7 +14,7 @@ import numpy as np
 import re
 
 from data_retrieval.codes import tz
-from data_retrieval.utils import to_str
+from data_retrieval.utils import to_str, format_datetime
 
 WATERDATA_URL = 'https://nwis.waterdata.usgs.gov/nwis/'
 WATERSERVICE_URL = 'https://waterservices.usgs.gov/nwis/'
@@ -29,10 +29,7 @@ def format_response(df, service=None):
     if df is None:
         return
 
-    if service=='qwdata':
-        df = preformat_qwdata_response(df)
-
-    elif service=='peaks':
+    if service=='peaks':
         df = preformat_peaks_response(df)
 
     #check for multiple sites:
@@ -55,17 +52,6 @@ def preformat_peaks_response(df):
     df.dropna(subset=['datetime'])
     return df
 
-def preformat_qwdata_response(df):
-    #create a datetime index from the columns in qwdata response
-    df['sample_start_time_datum_cd'] = df['sample_start_time_datum_cd'].map(tz)
-
-    df['datetime'] = pd.to_datetime(df.pop('sample_dt') + ' ' +
-                                    df.pop('sample_tm') + ' ' +
-                                    df.pop('sample_start_time_datum_cd'),
-                                    format = '%Y-%m-%d %H:%M')
-
-    return df
-
 
 def get_qwdata(**kwargs):
     """Get water sample data from qwdata service.
@@ -84,8 +70,10 @@ def get_qwdata(**kwargs):
     query = query_waterdata('qwdata',**kwargs)
 
     df = read_rdb(query)
+    df = format_datetime(df, 'sample_dt', 'sample_tm',
+                         'sample_start_time_datum_cd')
 
-    return format_response(df, service='qwdata')
+    return format_response(df)
 
 
 def get_discharge_measurements(**kwargs):
@@ -112,6 +100,16 @@ def get_discharge_peaks(**kwargs):
     df = read_rdb(query)
 
     return format_response(df, service='peaks')
+
+def get_gwlevels(**kwargs):
+    """Querys the groundwater level service from waterservices
+    """
+    query = query_waterservices('gwlevels', **kwargs)
+
+    df = read_rdb(query)
+    df = format_datetime(df, 'lev_dt', 'lev_tm', 'lev_tz_cd')
+
+    return format_response(df)
 
 
 def get_stats(**kwargs):
@@ -222,6 +220,9 @@ def query_waterservices(service, **kwargs):
     if service not in WATERSERVICES_SERVICES:
         raise TypeError('Service not recognized')
 
+    if 'format' not in kwargs:
+        kwargs['format'] = 'rdb'
+
     url = WATERSERVICE_URL + service
 
     return query(url, **kwargs)
@@ -316,7 +317,6 @@ def get_record(sites=None, start=None, end=None, state=None, service='iv', *args
 
     elif service == 'site':
         record_df = get_info(sites=sites)
-        #record_df = get_site_desc(sites)
 
     elif service == 'measurements':
         record_df = get_discharge_measurements(site_no=sites, begin_date=start,
@@ -325,6 +325,12 @@ def get_record(sites=None, start=None, end=None, state=None, service='iv', *args
     elif service == 'peaks':
         record_df = get_discharge_peaks(site_no=sites, begin_date=start,
                                         end_date=end, **kwargs)
+
+    elif service == 'gwlevels':
+        record_df = get_gwlevels(sites=sites, startDT=start, endDT=end, **kwargs)
+
+    else:
+        raise TypeError('{} service not yet implemented'.format(service))
 
     return record_df
 

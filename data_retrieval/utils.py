@@ -5,6 +5,8 @@ import pandas as pd
 from pandas.core.indexes.multi import MultiIndex
 from pandas.core.indexes.datetimes import DatetimeIndex
 
+from data_retrieval.codes import tz
+
 def to_str(listlike):
     """Translates list-like objects into strings.
 
@@ -22,6 +24,42 @@ def to_str(listlike):
 
     elif type(listlike) == str:
         return listlike
+
+def format_datetime(df, date_field, time_field, tz_field):
+    """Creates a datetime field from separate date, time, and
+    time zone fields.
+
+    Assumes ISO 8601.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing date, time, and timezone fields.
+
+    date_field : string
+        Name of date column in df.
+
+    time_field : string
+        Name of time column in df.
+
+    tz_field : string
+        Name of time zone column in df.
+
+    Returns
+    -------
+    df : DataFrame
+    """
+
+    #create a datetime index from the columns in qwdata response
+    df[tz_field] = df[tz_field].map(tz)
+
+    df['datetime'] = pd.to_datetime(df.pop(date_field) + ' ' +
+                                    df.pop(time_field) + ' ' +
+                                    df.pop(tz_field),
+                                    format = '%Y-%m-%d %H:%M')
+
+    return df
+
 
 def mmerge_asof(left, right, tolerance=None, **kwargs):
     """Merges two dataframes with multi-index.
