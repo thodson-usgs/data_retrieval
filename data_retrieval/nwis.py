@@ -52,6 +52,12 @@ def preformat_peaks_response(df):
     df.dropna(subset=['datetime'])
     return df
 
+def try_format_datetime(df, date_field, time_field, tz_field):
+    try:
+        return format_datetime(df, date_field, time_field, tz_field)
+
+    except TypeError:
+        return None
 
 def get_qwdata(**kwargs):
     """Get water sample data from qwdata service.
@@ -70,8 +76,8 @@ def get_qwdata(**kwargs):
     query = query_waterdata('qwdata',**kwargs)
 
     df = read_rdb(query)
-    df = format_datetime(df, 'sample_dt', 'sample_tm',
-                         'sample_start_time_datum_cd')
+    df = try_format_datetime(df, 'sample_dt', 'sample_tm',
+                             'sample_start_time_datum_cd')
 
     return format_response(df)
 
@@ -107,7 +113,7 @@ def get_gwlevels(**kwargs):
     query = query_waterservices('gwlevels', **kwargs)
 
     df = read_rdb(query)
-    df = format_datetime(df, 'lev_dt', 'lev_tm', 'lev_tz_cd')
+    df = try_format_datetime(df, 'lev_dt', 'lev_tm', 'lev_tz_cd')
 
     return format_response(df)
 
