@@ -111,3 +111,35 @@ def mmerge_asof(left, right, tolerance=None, **kwargs):
                               by=index_name)
 
     return merged_df.set_index([index_name, dt_name]).sort_index()
+
+#This function may be deprecated once pandas.update support joins besides left.
+def update_merge(left, right, na_only=False, on=None, **kwargs):
+    """Performs a combination update and merge.
+
+    Args:
+    left (DataFrame): original data
+    right (DataFrame): updated data
+    na_only (bool): if True, only update na values
+
+    TODO: na_only
+    """
+    #df = left.merge(right, how='outer',
+    #                left_index=True, right_index=True)
+    df = left.merge(right, how='outer', on=on, **kwargs)
+
+
+    # check for column overlap and resolve update
+    for column in df.columns:
+        #if duplicated column, use the value from right
+        if column[-2:] == '_x':
+            name = column[:-2] # find column name
+
+            if na_only:
+                df[name] = df[name+'_x'].fillna(df[name+'_y'])
+
+            else:
+                df[name] = df[name+'_x'].update(df[name+'_y'])
+
+            df.drop([name + '_x', name + '_y'], axis=1, inplace=True)
+
+    return df

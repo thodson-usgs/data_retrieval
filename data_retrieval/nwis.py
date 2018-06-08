@@ -14,7 +14,7 @@ import numpy as np
 import re
 
 from data_retrieval.codes import tz
-from data_retrieval.utils import to_str, format_datetime
+from data_retrieval.utils import to_str, format_datetime, update_merge
 
 WATERDATA_URL = 'https://nwis.waterdata.usgs.gov/nwis/'
 WATERSERVICE_URL = 'https://waterservices.usgs.gov/nwis/'
@@ -350,6 +350,7 @@ def read_json(json, multi_index=False):
     Returns:
         DataFrame containing times series data from the NWIS json.
     """
+    merged_df = pd.DataFrame()
     for timeseries in json['value']['timeSeries']:
 
         site_no = timeseries['sourceInfo']['siteCode'][0]['value']
@@ -393,15 +394,12 @@ def read_json(json, multi_index=False):
                                       'dateTime':'datetime',
                                       'qualifiers':col_name + '_cd'}, inplace=True)
 
-            try:
-                merged_df = merged_df.merge(record_df, on=['site_no','datetime'],how='outer')
-
-            except MemoryError:
-                #merged_df wasn't created
+            if merged_df.empty:
                 merged_df = record_df
 
-            except NameError:
-                merged_df = record_df
+            else:
+                merged_df = update_merge(merged_df, record_df, na_only=True,
+                                         on=['site_no','datetime'])
 
     return format_response(merged_df)
 
