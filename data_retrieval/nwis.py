@@ -10,17 +10,15 @@ Todo:
 import pandas as pd
 import requests
 from io import StringIO
-import numpy as np
-import re
 
-from data_retrieval.codes import tz
 from data_retrieval.utils import to_str, format_datetime, update_merge
 
 WATERDATA_URL = 'https://nwis.waterdata.usgs.gov/nwis/'
 WATERSERVICE_URL = 'https://waterservices.usgs.gov/nwis/'
 
-WATERSERVICES_SERVICES = ['dv','iv','site','stat','gwlevels']
-WATERDATA_SERVICES = ['qwdata','measurements','peaks', 'pmcodes'] # add more services
+WATERSERVICES_SERVICES = ['dv', 'iv', 'site', 'stat', 'gwlevels']
+WATERDATA_SERVICES = ['qwdata', 'measurements', 'peaks', 'pmcodes']
+# add more services
 
 
 def format_response(df, service=None):
@@ -29,17 +27,17 @@ def format_response(df, service=None):
     if df is None:
         return
 
-    if service=='peaks':
+    if service == 'peaks':
         df = preformat_peaks_response(df)
 
-    #check for multiple sites:
+    # check for multiple sites:
     if 'datetime' not in df.columns:
-        #XXX: consider making site_no index
+        # XXX: consider making site_no index
         return df
 
     elif len(df['site_no'].unique()) > 1:
-        #setup multi-index
-        df.set_index(['site_no','datetime'], inplace=True)
+        # setup multi-index
+        df.set_index(['site_no', 'datetime'], inplace=True)
 
     else:
         df.set_index(['datetime'], inplace=True)
@@ -52,6 +50,7 @@ def preformat_peaks_response(df):
     df.dropna(subset=['datetime'])
     return df
 
+
 def try_format_datetime(df, date_field, time_field, tz_field):
     try:
         return format_datetime(df, date_field, time_field, tz_field)
@@ -59,21 +58,28 @@ def try_format_datetime(df, date_field, time_field, tz_field):
     except TypeError:
         return None
 
+
 def get_qwdata(**kwargs):
     """Get water sample data from qwdata service.
     """
-    #check number of sites, may need to create multiindex
+    # check number of sites, may need to create multiindex
 
-    payload = {'agency_cd':'USGS', 'format':'rdb',
-               'pm_cd_compare':'Greater than', 'inventory_output':'0',
-               'rdb_inventory_output':'file', 'TZoutput':'0',
-               'radio_parm_cds':'all_parm_cds', 'rdb_qw_attributes':'expanded',
-               'date_format':'YYYY-MM-DD', 'rdb_compression':'value',
-               'submmitted_form':'brief_list', 'qw_sample_wide':'separated_wide'}
+    payload = {'agency_cd': 'USGS',
+               'format': 'rdb',
+               'pm_cd_compare': 'Greater than',
+               'inventory_output': '0',
+               'rdb_inventory_output': 'file',
+               'TZoutput': '0',
+               'radio_parm_cds': 'all_parm_cds',
+               'rdb_qw_attributes': 'expanded',
+               'date_format': 'YYYY-MM-DD',
+               'rdb_compression': 'value',
+               'submmitted_form': 'brief_list',
+               'qw_sample_wide': 'separated_wide'}
 
     kwargs = {**payload, **kwargs}
 
-    query = query_waterdata('qwdata',**kwargs)
+    query = query_waterdata('qwdata', **kwargs)
 
     df = read_rdb(query)
     df = try_format_datetime(df, 'sample_dt', 'sample_tm',
@@ -106,6 +112,7 @@ def get_discharge_peaks(**kwargs):
     df = read_rdb(query)
 
     return format_response(df, service='peaks')
+
 
 def get_gwlevels(**kwargs):
     """Querys the groundwater level service from waterservices
@@ -180,10 +187,9 @@ def query(url, **kwargs):
 def query_waterdata(service, **kwargs):
     """Querys waterdata.
     """
-    major_params = ['site_no','state_cd']
+    major_params = ['site_no', 'state_cd']
     bbox_params = ['nw_longitude_va', 'nw_latitude_va',
-                   'se_longitude_va','se_latitude_va']
-
+                   'se_longitude_va', 'se_latitude_va']
 
     if not any(key in kwargs for key in major_params + bbox_params):
         raise TypeError('Query must specify a major filter: site_no, stateCd, bBox')
@@ -194,7 +200,6 @@ def query_waterdata(service, **kwargs):
 
     if service not in WATERDATA_SERVICES:
         raise TypeError('Service not recognized')
-
 
     url = WATERDATA_URL + service
 
@@ -220,7 +225,7 @@ def query_waterservices(service, **kwargs):
 
     Usage: must specify one major filter: sites, stateCd, bBox,
     """
-    if not any(key in kwargs for key in ['sites','stateCd','bBox']):
+    if not any(key in kwargs for key in ['sites', 'stateCd', 'bBox']):
         raise TypeError('Query must specify a major filter: sites, stateCd, bBox')
 
     if service not in WATERSERVICES_SERVICES:
@@ -271,28 +276,29 @@ def get_pmcodes(**kwargs):
     Returns:
         DataFrame containgin the USGS parameter codes
     """
-    payload = {'radio_pm_search':'param_group',
-               'pm_group':'All+--+include+all+parameter+groups',
-               'pm_sarch':None,
-               'casrn_search':None,
-               'srsname_search':None,
-               'show':'parameter_group_nm',
-               'show':'casrn',
-               'show':'srsname',
-               'show':'parameter_units',
-               'format':'rdb',
-              }
+    payload = {'radio_pm_search': 'param_group',
+               'pm_group': 'All+--+include+all+parameter+groups',
+               'pm_sarch': None,
+               'casrn_search': None,
+               'srsname_search': None,
+               'show': 'parameter_group_nm',
+               'show': 'casrn',
+               'show': 'srsname',
+               'show': 'parameter_units',
+               'format': 'rdb',
+               }
 
     kwargs = {**payload, **kwargs}
 
-    #FIXME check that the url is correct
+    # XXX check that the url is correct
     url = WATERSERVICE_URL + 'pmcodes'
-    df = read_rdb( query(url, **kwargs) )
+    df = read_rdb(query(url, **kwargs))
 
     return format_response(df)
 
 
-def get_record(sites=None, start=None, end=None, state=None, service='iv', *args, **kwargs):
+def get_record(sites=None, start=None, end=None, state=None,
+               service='iv', *args, **kwargs):
     """
     Get data from NWIS and return it as a DataFrame.
 
@@ -333,7 +339,8 @@ def get_record(sites=None, start=None, end=None, state=None, service='iv', *args
                                         end_date=end, **kwargs)
 
     elif service == 'gwlevels':
-        record_df = get_gwlevels(sites=sites, startDT=start, endDT=end, **kwargs)
+        record_df = get_gwlevels(sites=sites, startDT=start, endDT=end,
+                                 **kwargs)
 
     else:
         raise TypeError('{} service not yet implemented'.format(service))
@@ -355,15 +362,15 @@ def read_json(json, multi_index=False):
 
         site_no = timeseries['sourceInfo']['siteCode'][0]['value']
         param_cd = timeseries['variable']['variableCode'][0]['value']
-        #check whether min, max, mean record XXX
-        option =  timeseries['variable']['options']['option'][0].get('value')
+        # check whether min, max, mean record XXX
+        option = timeseries['variable']['options']['option'][0].get('value')
 
         # loop through each parameter in timeseries.
         for parameter in timeseries['values']:
             col_name = param_cd
-            method =  parameter['method'][0]['methodDescription']
+            method = parameter['method'][0]['methodDescription']
 
-            #if len(timeseries['values']) > 1 and method:
+            # if len(timeseries['values']) > 1 and method:
             if method:
                 # get method, format it, and append to column name
                 method = method.strip("[]()").lower()
@@ -372,34 +379,36 @@ def read_json(json, multi_index=False):
             if option:
                 col_name = '{}_{}'.format(col_name, option)
 
-            col_cd_name = col_name + '_cd'
             record_json = parameter['value']
 
             if not record_json:
-                #no data in record
+                # no data in record
                 continue
-            #should be able to avoid this by dumping
-            record_json = str(record_json).replace("'",'"')
+            # should be able to avoid this by dumping
+            record_json = str(record_json).replace("'", '"')
 
             # read json, converting all values to float64 and all qaulifiers
-            # to str. Lists can't be hashed, thus we cannot df.merge on a list column
-            record_df   = pd.read_json(record_json, orient='records',
-                                       dtype={'value':'float64',
-                                              'qualifiers':'unicode'})
+            # Lists can't be hashed, thus we cannot df.merge on a list column
+            record_df = pd.read_json(record_json,
+                                     orient='records',
+                                     dtype={'value': 'float64',
+                                            'qualifiers': 'unicode'})
 
-            record_df['qualifiers'] = record_df['qualifiers'].str.strip("[]").str.replace("'","")
+            record_df['qualifiers'] = (record_df['qualifiers']
+                                       .str.strip("[]").str.replace("'", ""))
             record_df['site_no'] = site_no
 
-            record_df.rename(columns={'value':col_name,
-                                      'dateTime':'datetime',
-                                      'qualifiers':col_name + '_cd'}, inplace=True)
+            record_df.rename(columns={'value': col_name,
+                                      'dateTime': 'datetime',
+                                      'qualifiers': col_name + '_cd'},
+                             inplace=True)
 
             if merged_df.empty:
                 merged_df = record_df
 
             else:
                 merged_df = update_merge(merged_df, record_df, na_only=True,
-                                         on=['site_no','datetime'])
+                                         on=['site_no', 'datetime'])
 
     return format_response(merged_df)
 
@@ -412,7 +421,6 @@ def read_rdb(rdb):
     """
     if rdb.startswith('No sites/data'):
         return None
-    #return None
 
     count = 0
 
@@ -426,8 +434,8 @@ def read_rdb(rdb):
 
     fields = rdb.splitlines()[count].split('\t')
     dtypes = {'site_no': str}
-    #dtypes =  {‘site_no’: str, }
-    df = pd.read_csv(StringIO(rdb), delimiter='\t', skiprows=count+2, names=fields,
-                     na_values='NaN', dtype=dtypes)
+
+    df = pd.read_csv(StringIO(rdb), delimiter='\t', skiprows=count+2,
+                     names=fields, na_values='NaN', dtype=dtypes)
 
     return format_response(df)
