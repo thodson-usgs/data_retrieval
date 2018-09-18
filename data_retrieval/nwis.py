@@ -142,7 +142,7 @@ def get_stats(**kwargs):
     if sites not in kwargs:
         raise TypeError('Query must specify a site or list of sites')
 
-    query = waterservices_query('stat', **kwargs)
+    query = query_waterservices('stat', **kwargs)
 
     return read_rdb(query)
 
@@ -176,6 +176,9 @@ def query(url, **kwargs):
         print('could not connect to {}'.format(req.url))
 
     response_format = kwargs.get('format')
+
+    if req.status_code == 400:
+        return False
 
     if response_format == 'json':
         return req.json()
@@ -249,12 +252,83 @@ def get_dv(**kwargs):
 
 def get_info(**kwargs):
     """
-    Get site description information from NWIS
+    Get site description information from NWIS.
 
-    Parameters:
-        See waterservices_query
+    Note: Must specify one major parameter.
 
-    Note: Must specify one major filter: site_no, stateCd, bBox
+    Major Parameters
+    ----------------
+    sites : string or list
+        A list of site numters. Sites may be prefixed with an optional agency
+        code followed by a colon.
+
+    stateCd : string
+        U.S. postal service (2-digit) state code. Only 1 state can be specified
+        per request.
+
+    huc : string or list
+        A list of hydrologic unit codes (HUC) or aggregated watersheds. Only 1
+        major HUC can be specified per request, or up to 10 minor HUCs. A major
+        HUC has two digits.
+
+    bBox : list
+        A contiguous range of decimal latitude and longitude, starting with the
+        west longitude, then the south latitude, then the east longitude, and
+        then the north latitude with each value separated by a comma. The
+        product of the range of latitude range and longitude cannot exceed 25
+        degrees. Whole or decimal degrees must be specified, up to six digits
+        of precision. Minutes and seconds are not allowed.
+
+    countyCd : string or list
+        A list of county numbers, in a 5 digit numeric format. The first two
+        digits of a county's code are the FIPS State Code.
+        (url: https://help.waterdata.usgs.gov/code/county_query?fmt=html)
+
+    Minor Parameters
+    ----------------
+    startDt : string
+        Selects sites based on whether data was collected at a point in time
+        beginning after startDt (start date). Dates must be in ISO-8601
+        Calendar Date format (for example: 1990-01-01).
+
+    endDt : string
+
+    period : string
+        Selects sites based on whether or not they were active between now
+        and a time in the past. For example, period=P10W will select sites
+        active in the last ten weeks.
+
+    modifiedSince : string
+        Returns only sites where site attributes or period of record data have
+        changed during the request period.
+
+    parameterCd : string or list
+        Returns only site data for thos sites containing the requested USGS
+        parameter codes.
+
+    siteType : string or list
+        Restricts sites to those having one or more major and/or minor site
+        types, such as stream, spring or well. For a list of all valid site
+        types see https://help.waterdata.usgs.gov/site_tp_cd
+        For example, siteType='ST' returns streams only.
+
+    Formatting Parameters
+    ---------------------
+    siteOutput : string ('basic' or 'expanded')
+        Indicates the richness of metadata you want for site attributes. Note
+        that for visually oriented formats like Google Map format, this
+        argument has no meaning. Note: for performance reasons,
+        siteOutput=expanded cannot be used if seriesCatalogOutput=true or with
+        any values for outputDataTypeCd.
+
+    seriesCatalogOutput : boolean
+        A switch that provides detailed period of record information for
+        certain output formats. The period of record indicates date ranges for
+        a certain kind of information about a site, for example the start and
+        end dates for a site's daily mean streamflow.
+
+    For additional parameter options see
+    https://waterservices.usgs.gov/rest/Site-Service.html#stateCd
     """
 
     query = query_waterservices('site', **kwargs)
